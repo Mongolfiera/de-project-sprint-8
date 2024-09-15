@@ -80,16 +80,13 @@ incomming_message_schema = StructType([
     StructField('datetime_created', LongType(), True)
 ])
 
-# определяем текущее время в UTC в миллисекундах, затем округляем до секунд
-current_timestamp_utc = round(unix_timestamp(current_timestamp()))
-
 # десериализуем из value сообщения json и фильтруем по времени старта и окончания акции
 filtered_read_stream_df = (
     restaurant_read_stream_df
     .withColumn('value', col('value').cast(StringType()))
     .withColumn('event', from_json(col('value'), incomming_message_schema))
     .selectExpr('event.*')
-    .filter(lit(current_timestamp_utc).between(
+    .filter(lit(unix_timestamp(current_timestamp())).between(
         col('adv_campaign_datetime_start'), col('adv_campaign_datetime_end')
     ))
 )
@@ -113,7 +110,7 @@ result_df = (
                 from_unixtime(col('datetime_created'), "yyyy-MM-dd' 'HH:mm:ss.SSS").cast(TimestampType()))
     .dropDuplicates(['restaurant_id', 'adv_campaign_id', 'adv_campaign_datetime_start'])
     .withWatermark('datetime_created', '10 minutes')
-    .withColumn('trigger_datetime_created', lit(current_timestamp_utc).cast(LongType()))
+    .withColumn('trigger_datetime_created', lit(round(unix_timestamp(current_timestamp()))).cast(LongType()))
 )
 
 # запускаем стриминг
